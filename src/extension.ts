@@ -38,13 +38,14 @@ export function activate(context: vscode.ExtensionContext) {
 		if (timeout) {
 			clearTimeout(timeout);
 		}
-		timeout = setTimeout(updateDecorations, 500);
+		timeout = setTimeout(updateDecorations, 10);
 	}
 
 	function updateDecorations() {
 		if (!activeEditor) {
 			return;
         }
+        
         const tabLineRegEx = /(?:.*\t.*(?:\r?\n|$))+/g;
 		const text = activeEditor.document.getText();
         const tabLines: vscode.DecorationOptions[] = [];
@@ -55,27 +56,65 @@ export function activate(context: vscode.ExtensionContext) {
             var colLines = lineCols[0].map((_, i) => lineCols.map(row => row[i]));
             var colSizes = colLines.map(col => col.reduce((p, c) => p.length > c.length ? p : c).length);
 
-            const tabOrNewLineRegEx = /(?:(.*?)(\t|\n|\r\n))/g;
-            let subMatch;
-            let currentColumn = 0;
-            while (subMatch = tabOrNewLineRegEx.exec(match[0])) {
-                if (subMatch[2] === "\n" || subMatch[2] === "\r\n") {
-                    currentColumn = 0;
-                } else {
-                    var padding = "_".repeat(colSizes[currentColumn] - subMatch[1].length);
-                    var tabIndex = match.index + subMatch.index + subMatch[1].length;
-                    var startPos = activeEditor.document.positionAt(tabIndex);
-                    var endPos = activeEditor.document.positionAt(tabIndex + 1);
-                    tabLines.push({
-                        range: new vscode.Range(startPos, endPos),
-                        renderOptions: {
-                            after: {contentText: padding + "|", color: "rgba(127,127,127,0.0)"},
+            var leftAlign = true;
+            if (leftAlign) {
+                const tabOrNewLineRegEx = /(?:(.*?)(\t|\n|\r\n))/g;
+                let subMatch;
+                let currentColumn = 0;
+                while (subMatch = tabOrNewLineRegEx.exec(match[0])) {
+                    if (subMatch[2] === "\n" || subMatch[2] === "\r\n") {
+                        currentColumn = 0;
+                    } else {
+                        var padding = "_".repeat(colSizes[currentColumn] - subMatch[1].length);
+                        var tabIndex = match.index + subMatch.index + subMatch[1].length;
+                        var startPos = activeEditor.document.positionAt(tabIndex);
+                        var endPos = activeEditor.document.positionAt(tabIndex + 1);
+                        tabLines.push({
+                            range: new vscode.Range(startPos, endPos),
+                            renderOptions: {
+                                after: {contentText: padding + "|", color: "rgba(127,127,127,0.0)"},
+                            }
+                        });
+                        currentColumn++;
+                    }
+                }
+            } else {
+                const tabOrNewLineRegEx = /(?:(\t?)([^\t|\n|\r\n]+)|(\n|\r\n))/g;
+                let subMatch;
+                let currentColumn = 0;
+                while (subMatch = tabOrNewLineRegEx.exec(match[0])) {
+                    if (subMatch[3] === "\n" || subMatch[3] === "\r\n") {
+                        currentColumn = 0;
+                    } else {
+                        if (subMatch[1] === "\t" && currentColumn === 0) {
+                            var padding = "_".repeat(colSizes[currentColumn]);
+                            var whitespaceIndex = match.index + subMatch.index;
+                            var startPos = activeEditor.document.positionAt(whitespaceIndex);
+                            var endPos = activeEditor.document.positionAt(whitespaceIndex + (subMatch[1] === "\t" ? 1 : 0));
+                            tabLines.push({
+                                range: new vscode.Range(startPos, endPos),
+                                renderOptions: {
+                                    after: {contentText: padding + "|", color: "rgba(127,127,127,0.5)"},
+                                }
+                            });
+                            currentColumn++;
                         }
-                    });
-                    currentColumn++;
+                        var padding = "_".repeat(colSizes[currentColumn] - subMatch[2].length);
+                        var whitespaceIndex = match.index + subMatch.index;
+                        var startPos = activeEditor.document.positionAt(whitespaceIndex);
+                        var endPos = activeEditor.document.positionAt(whitespaceIndex + (subMatch[1] === "\t" ? 1 : 0));
+                        tabLines.push({
+                            range: new vscode.Range(startPos, endPos),
+                            renderOptions: {
+                                after: {contentText: padding + "|", color: "rgba(127,127,127,0.3)"},
+                            }
+                        });
+                        currentColumn++;
+                    }
                 }
             }
         }
+        console.log('updated');
 		activeEditor.setDecorations(tabDecorationType, tabLines);
 	}
 }
